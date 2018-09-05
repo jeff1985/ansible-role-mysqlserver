@@ -1,0 +1,15 @@
+#!/bin/bash
+BDIR="/backup/mysql_xtra"
+
+#remove old backups
+rm $BDIR/backup*
+
+#wait a couple of seconds to let operating system do important staff after deleting big files
+sleep 120
+
+# Run backup
+/usr/bin/innobackupex --defaults-file=/etc/mysql/my.cnf --user=root --password={{ mysql_root_password }} --stream=tar ./ | gzip -c -1 > $BDIR/backup.`date +%m%d%Y%H%M%S`.tar.gz
+
+
+# Remove backups older than 3 days
+#find $BDIR -wholename $BDIR/backup.\* -ctime +3 -exec rm {} \;

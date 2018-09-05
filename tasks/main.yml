@@ -1,0 +1,115 @@
+- apt_repository:
+    repo: "{{item}}"
+    update_cache: false  # We will do ourselfs afterwards
+  register: multiverse_installed
+  when: ansible_distribution == 'Ubuntu'
+  with_items:
+    - 'deb http://archive.ubuntu.com/ubuntu {{ansible_distribution_release}} multiverse'
+    - 'deb-src http://archive.ubuntu.com/ubuntu {{ansible_distribution_release}} multiverse'
+    - 'deb http://archive.ubuntu.com/ubuntu {{ansible_distribution_release}}-updates multiverse'
+    - 'deb-src http://archive.ubuntu.com/ubuntu {{ansible_distribution_release}}-updates multiverse'
+    - 'deb http://repo.percona.com/apt {{ansible_distribution_release}} main'
+    - 'deb-src http://repo.percona.com/apt {{ansible_distribution_release}} main'
+
+# add percona repository's public key
+#-  shell: apt-key adv --keyserver keys.gnupg.net --recv-keys 1C4CBDCDCD2EFD2A
+-  shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8507EFA5
+
+
+- apt:
+    update_cache: true
+  when: multiverse_installed | changed
+
+
+
+- include: packages.yml
+  vars:
+    percona_package: percona-xtrabackup-24
+  when: ansible_distribution_release == 'xenial'
+
+- include: packages.yml
+  vars:
+    percona_package: percona-xtrabackup
+  when: ansible_distribution_release != 'xenial'
+
+- name: Start the MySQL service
+  action: service name=mysql state=started
+
+# 'localhost' needs to be the last item for idempotency, see
+# http://ansible.cc/docs/modules.html#mysql-user
+- name: update mysql root password for all root accounts
+  mysql_user: name=root host={{ item }} password={{ mysql_root_password }}
+  with_items:
+    - "{{ ansible_hostname }}"
+    - 127.0.0.1
+    - ::1
+    - localhost
+
+- name: copy .my.cnf file with root password credentials
+  template: src=files/root/my.cnf.j2 dest=/root/.my.cnf owner=root mode=0600
+
+- name: delete anonymous MySQL server user for $server_hostname
+  action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+
+- name: delete anonymous MySQL server user for localhost
+  action: mysql_user user="" state="absent"
+
+- name: remove the MySQL test database
+  action: mysql_db db=test state=absent
+
+#- lineinfile:
+#    dest: "{{ mysql_config_file }}"
+#    regexp: "^bind-address"
+#    line: "bind-address = 0.0.0.0"
+#    state: present
+#  notify: restart mysql
+
+- name: set bind-address for mysql
+  blockinfile:
+    dest: "{{ mysql_config_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BIND-ADDRESS BLOCK"
+    block: |
+      [mysqld]
+      bind-address = 0.0.0.0
+ # remove STRICT_TRANS_TABLES from default mysql 5.7
+- name: set sql mode
+  lineinfile:
+    dest: "{{ mysql_config_file }}"
+    regexp: "^sql_mode="
+    line: "sql_mode=\"ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\""
+
+- name: "set datadir to {{ mysql_data_dir }}"
+  tags: ['datadir']
+  lineinfile:
+    dest: "{{ mysql_config_file }}"
+    regexp: "^datadir[ \t]*="
+    line: "datadir = {{ mysql_data_dir }}"
+
+- name: create /backup dir
+  file: path=/backup/ state=directory owner=root group=root mode=0700
+
+- name: create /backup/mysql_xtra/ dir
+  file: path=/backup/mysql_xtra/ state=directory owner=root group=root mode=0700
+
+
+- name: configure xtrabackup script
+  template:
+    src: "templates/backup/xtrabackup.sh.j2"
+    dest: "/backup/xtrabackup.sh"
+    owner: root
+    group: root
+    mode: 0700
+
+- name: configure xtrabackup cronjob
+  cron:
+    name: "backup"
+    minute: "1"
+    hour: "1"
+    job: '/backup/xtrabackup.sh'
+    user: root
+
+
+- file: path=/etc/systemd/system/mysql.service.d/ owner="root" group="root" mode=766 state=directory
+  tags: filelimit
+- copy: src=files/override.conf dest=/etc/systemd/system/mysql.service.d/override.conf owner=root group=root mode=0644
+  tags: filelimit

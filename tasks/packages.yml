@@ -1,0 +1,15 @@
+- name: Install MySQL
+  action: apt name={{ item }}
+  with_items:
+    - python-mysqldb
+    - mysql-client
+    - mysql-server
+    - "{{ percona_package }}"
+    # for lvm backup
+    - mylvmbackup
+    - libfile-copy-recursive-perl
+    - mydumper
+    # for remote backup to storagebox
+    - cifs-utils
+    # needed for uncompressing backups
+    - qpress
