@@ -94,8 +94,8 @@
 
 - name: configure xtrabackup script
   template:
-    src: "templates/backup/xtrabackup.sh.j2"
-    dest: "/backup/xtrabackup.sh"
+    src: "templates/backup/remotebackup.sh.j2"
+    dest: "/backup/remotebackup.sh"
     owner: root
     group: root
     mode: 0700
@@ -105,7 +105,7 @@
     name: "backup"
     minute: "1"
     hour: "1"
-    job: '/backup/xtrabackup.sh'
+    job: '/backup/remotebackup.sh'
     user: root
 
 

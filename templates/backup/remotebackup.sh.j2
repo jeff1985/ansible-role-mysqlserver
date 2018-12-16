@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+ENCRYPTKEY={{ remotebackup_encryptkey }}
+STORAGEURL={{ remotebackup_storageurl }}
+STORAGEUSER={{ remotebackup_storageuser }}
+STORAGEPW={{ remotebackup_storagepassword }}
+TARGETDIR=/backup/xtrabackup-`hostname`-`date +%Y-%m-%d`
+
+echo "----- remove older local backups if any -----"
+rm -rf /backup/xtrabackup*
+
+echo "----- run xtrabackup with compress and encrypt -----"
+xtrabackup --backup --compress --compress-threads=4 --encrypt-threads=4 --encrypt=AES256 --encrypt-key="$ENCRYPTKEY" --target-dir=$TARGETDIR
+
+
+{% if remotebackup_storageurl is not none %}
+echo "----- mount storagebox -----"
+/sbin/mount.cifs -o user=$STORAGEUSER,pass=$STORAGEPW $STORAGEURL /backup_remote/
+cd /backup_remote/
+
+echo "----- delete older remote backups -----"
+find xtra* -maxdepth 0 -type d -mtime +14 -exec rm -rf {} \;
+
+echo "----- copy local backup $TARGETDIR to storagebox -----"
+cp -r $TARGETDIR ./
+
+echo "----- delete local backup from $TARGETDIR -----"
+rm -rf $TARGETDIR
+
+echo "----- list current backups on storagebox -----"
+ls -lah
+
+echo "----- sleep 2mins to allow remote disk to finish all data operations -----"
+sleep 120
+
+echo "----- unmount /backup_remote ----- "
+umount -l /backup_remote
+{%endif %}
+
+echo "----- list current local disk space usage ----- "
+df -h
