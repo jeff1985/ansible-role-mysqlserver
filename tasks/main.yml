@@ -88,6 +88,9 @@
 - name: create /backup dir
   file: path=/backup/ state=directory owner=root group=root mode=0700
 
+- name: create /backup_remote dir
+  file: path=/backup_remote/ state=directory owner=root group=root mode=0700
+
 - name: create /backup/mysql_xtra/ dir
   file: path=/backup/mysql_xtra/ state=directory owner=root group=root mode=0700
 
