@@ -9,7 +9,7 @@ echo "----- remove older local backups if any -----"
 rm -rf /backup/xtrabackup*
 
 echo "----- run xtrabackup with compress and encrypt -----"
-xtrabackup --backup --compress --compress-threads=4 --encrypt-threads=4 --encrypt=AES256 --encrypt-key="$ENCRYPTKEY" --target-dir=$TARGETDIR
+xtrabackup --lock-ddl-per-table --lock-ddl-timeout=1200 --backup --compress --compress-threads=4 --encrypt-threads=4 --encrypt=AES256 --encrypt-key="$ENCRYPTKEY" --target-dir=$TARGETDIR
 
 
 {% if remotebackup_storageurl is not none %}
@@ -30,6 +30,7 @@ echo "----- list current backups on storagebox -----"
 ls -lah
 
 echo "----- sleep 2mins to allow remote disk to finish all data operations -----"
+date
 sleep 120
 
 echo "----- unmount /backup_remote ----- "
