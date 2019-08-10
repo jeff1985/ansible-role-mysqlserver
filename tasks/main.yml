@@ -14,6 +14,8 @@
 # add percona repository's public key
 #-  shell: apt-key adv --keyserver keys.gnupg.net --recv-keys 1C4CBDCDCD2EFD2A
 -  shell: apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8507EFA5
+# gnupg key is also needed for apt to be working properly
+-  shell: apt-key adv --keyserver keys.gnupg.net --recv-keys 8507EFA5
 
 
 - apt:
